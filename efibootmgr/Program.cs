@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.ComponentModel;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace EfiBootMgr
 {
@@ -29,22 +30,22 @@ namespace EfiBootMgr
 
         unsafe static ushort read_u16(string name)
         {
-			ushort value = 0;
-			//uint32_t attributes = 0;
-			var rc = Natives.GetFirmwareEnvironmentVariable(name, EFI_GLOBAL_GUID.ToString("B"), new IntPtr(&value), sizeof(ushort));
+            ushort value = 0;
+            //uint32_t attributes = 0;
+            var rc = Natives.GetFirmwareEnvironmentVariable(name, EFI_GLOBAL_GUID.ToString("B"), new IntPtr(&value), sizeof(ushort));
 
-			if (rc == 0)
+            if (rc == 0)
             {
                 //int error = Marshal.GetLastWin32Error(); // https://stackoverflow.com/a/17918729
                 throw new Win32Exception();
             }
-			else if (rc != sizeof(ushort))
-			{
-				throw new InvalidOperationException();
-			}
+            else if (rc != sizeof(ushort))
+            {
+                throw new InvalidOperationException();
+            }
 
-			return value;
-		}
+            return value;
+        }
 
         static (IntPtr buffer, uint size) read_dyn(string name, int initsize = 1024)
         {
@@ -70,6 +71,7 @@ namespace EfiBootMgr
                 }
                 break;
             }
+
             return (buffer, rc);
         }
 
@@ -79,6 +81,56 @@ namespace EfiBootMgr
             var result = new ushort[size / sizeof(ushort)];
             Copy(buffer, result, 0, size / sizeof(ushort));
             //Marshal.FreeCoTaskMem(buffer);
+            Marshal.FreeHGlobal(buffer);
+            return result;
+        }
+
+        static List<string> read_all_boot_entry_names()
+        {
+            var result = new List<string>();
+            uint size = 0;
+            var buffer = IntPtr.Zero;
+            var status = Natives.NtEnumerateBootEntries(buffer, ref size);
+            if (status != NtStatus.BufferTooSmall)
+            {
+                if (status >= 0)
+                {
+                    // Somehow there are no boot entries in NVRAM.
+                    Console.WriteLine("Somehow there are no boot entries in NVRAM.");
+                    return result;
+                }
+                else
+                {
+                    // An unexpected error occurred
+                    Console.WriteLine("An unexpected error occurred.");
+                    throw new Exception();
+                }
+            }
+
+            buffer = Marshal.AllocHGlobal((int)size);
+            status = Natives.NtEnumerateBootEntries(buffer, ref size);
+
+            if (status < 0)
+            {
+                // An unexpected error occurred
+                Console.WriteLine("An unexpected error occurred. 2");
+                Marshal.FreeHGlobal(buffer);
+                throw new Exception();
+            }
+
+            var currPtr = buffer;
+
+            for (var x = NtEfiBootEntryList.MarshalFromNative(currPtr); ; x = NtEfiBootEntryList.MarshalFromNative(currPtr += (int)x.NextEntryOffset))
+            {
+                var id = NtEfiBootEntry.MarshalFromNative(x.BootEntry).Id;
+                result.Add($"Boot{id.ToString("X4")}");
+
+                if (x.NextEntryOffset == 0)
+                {
+                    break;
+                }
+            }
+
             Marshal.FreeHGlobal(buffer);
             return result;
         }
@@ -108,22 +160,29 @@ namespace EfiBootMgr
                 ErrorHandling.HandleWarning(() => Console.WriteLine($"Timeout : {read_u16("Timeout")}"), "Could not read variable 'Timeout'", verbosity: 2);
             }
 
+            /*
             ErrorHandling.HandleWarning(() => Console.WriteLine($"{Enum.GetName(typeof(UefiLoadOptionType), VariableType)}Order: {string.Join(",", read_order(VariableType).Select(y => $"{y:X4}"))}"),
-                VariableType == UefiLoadOptionType.Boot ? "No BootOrder is set; firmware will attempt recovery" : $"No { Enum.GetName(typeof(UefiLoadOptionType), VariableType)}Order is set", 
+                VariableType == UefiLoadOptionType.Boot ? "No BootOrder is set; firmware will attempt recovery" : $"No { Enum.GetName(typeof(UefiLoadOptionType), VariableType)}Order is set",
                 verbosity: 2);
+            */
 
-            // Windows does not provide any function to iterate over all available firmware variables. Oh well.
-            for (int i = 0; i <= 0xFFFF; i++)
+            // Windows does not provide any documented function to iterate over all available firmware variables
+            // An undocumented function NtEnumerateBootEntries ntdll.dll returns all boot options in Windows specific struct
+            // It internally calls HalEnumerateEnvironmentVariablesEx from hal.dll, which actually returns all variables,
+            // filters them to only show Boot#### variables, and do additional parsing for convenience and Windows specific options. 
+
+            var BootEntryNames = read_all_boot_entry_names();
+
+            foreach (var variableName in BootEntryNames)
             {
-                var variableName = Enum.GetName(typeof(UefiLoadOptionType), VariableType) + $"{i:X4}";
-                var buffer = IntPtr.Zero; 
+                var buffer = IntPtr.Zero;
                 uint size = 0;
                 try
                 {
                     (buffer, size) = read_dyn(variableName);
                     var loadOption = EfiLoadOption.MarshalFromNative(buffer);
                     Console.WriteLine(variableName + ((loadOption.Attributes & EfiLoadOption.LOAD_OPTION_ACTIVE) != 0 ? "* " : "  ") + loadOption.Description);
-                } 
+                }
                 catch (Win32Exception win32exeption)
                 {
                     if (win32exeption.NativeErrorCode == 203) //not exist, skip
@@ -171,6 +230,7 @@ namespace EfiBootMgr
 		SysPrep,
     }
 
+    // EFI_LOAD_OPTION
     struct EfiLoadOption
     {
         public uint Attributes;
@@ -200,6 +260,43 @@ namespace EfiBootMgr
         //{
 
         //}
+    }
+
+    // BOOT_ENTRY, which is the Windows representation of EFI_LOAD_OPTION 
+    struct NtEfiBootEntry
+    {
+        // public uint Version;
+        // public uint Length;
+        public uint Id; // four-digit hex number part of its name Boot####
+        // public uint Attributes;
+        // public string FriendlyName; //FriendlyNameOffset: ULONG,
+        // public string BootFilePath; //BootFilePathOffset: ULONG,
+        // OsOptionsLength: ULONG,
+        // OsOptions: [UCHAR; 1],
+        
+        public unsafe static NtEfiBootEntry MarshalFromNative(IntPtr data)
+        {
+            var result = new NtEfiBootEntry();
+            result.Id = *(uint*)(data + 8);
+
+            return result;
+        }
+    }
+
+    // BOOT_ENTRY_LIST, singly linked list of BOOT_ENTRY
+    struct NtEfiBootEntryList
+    {
+        public uint NextEntryOffset; // offset from start of whole data to next BOOT_ENTRY_LIST
+        public IntPtr BootEntry; // BOOT_ENTRY, not actually a pointer, just put it her for convenience
+
+        public unsafe static NtEfiBootEntryList MarshalFromNative(IntPtr data)
+        {
+            var result = new NtEfiBootEntryList();
+            result.NextEntryOffset = *(uint*)data;
+            result.BootEntry = data + 4;
+
+            return result;
+        }
     }
 
 }
