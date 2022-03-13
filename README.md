@@ -23,7 +23,5 @@ any options.
 ## Known Limitations
 Windows has no documented way to itetrate all EFI NVRAM variables. Linux or 
 other Unix-like systems have `efi_get_next_variable_name` provided in efivar.
-Therefore, efibootmgr-net does not know, for example, how many BootOrder 
-entries there are and their names, and has to resort to testing all possible 
-BootOrder entries from 0x0000 to 0xFFFF. The only way I can think of is to 
-decompile bcdedit and see how it can list all boot options in EFI NVRAM. 
+Currently, efibootmgr-net has to rely on the undocunmented`NtEnumerateBootEntries`
+to get the list of existing `Boot####` variables. 
