@@ -50,8 +50,8 @@ namespace EfiBootMgr
         static (IntPtr buffer, uint size) read_dyn(string name, int initsize = 1024)
         {
             int size = initsize;
-            uint rc = 0;
-            var buffer = IntPtr.Zero;
+            uint rc;
+            IntPtr buffer;
             while (true)
             {
                 //buffer = Marshal.AllocCoTaskMem(size);
@@ -75,7 +75,7 @@ namespace EfiBootMgr
             return (buffer, rc);
         }
 
-        static ushort[] read_order(UefiLoadOptionType loadOptionType)
+        static ushort[] ReadLoadOptionOrder(UefiLoadOptionType loadOptionType)
         {
             (IntPtr buffer, uint size) = read_dyn(Enum.GetName(typeof(UefiLoadOptionType), loadOptionType) + "Order", sizeof(ushort) * 10);
             var result = new ushort[size / sizeof(ushort)];
@@ -85,7 +85,7 @@ namespace EfiBootMgr
             return result;
         }
 
-        static List<string> read_all_boot_entry_names()
+        static List<string> ReadAllBootEntryNames()
         {
             var result = new List<string>();
             uint size = 0;
@@ -120,9 +120,9 @@ namespace EfiBootMgr
 
             var currPtr = buffer;
 
-            for (var x = NtEfiBootEntryList.MarshalFromNative(currPtr); ; x = NtEfiBootEntryList.MarshalFromNative(currPtr += (int)x.NextEntryOffset))
+            for (var x = NtEfiBootEntryList.FromNative(currPtr); ; x = NtEfiBootEntryList.FromNative(currPtr += (int)x.NextEntryOffset))
             {
-                var id = NtEfiBootEntry.MarshalFromNative(x.BootEntry).Id;
+                var id = NtEfiBootEntry.FromNative(x.BootEntry).Id;
                 result.Add($"Boot{id.ToString("X4")}");
 
                 if (x.NextEntryOffset == 0)
@@ -160,18 +160,16 @@ namespace EfiBootMgr
                 ErrorHandling.HandleWarning(() => Console.WriteLine($"Timeout : {read_u16("Timeout")}"), "Could not read variable 'Timeout'", verbosity: 2);
             }
 
-            /*
-            ErrorHandling.HandleWarning(() => Console.WriteLine($"{Enum.GetName(typeof(UefiLoadOptionType), VariableType)}Order: {string.Join(",", read_order(VariableType).Select(y => $"{y:X4}"))}"),
+            ErrorHandling.HandleWarning(() => Console.WriteLine($"{Enum.GetName(typeof(UefiLoadOptionType), VariableType)}Order: {string.Join(",", ReadLoadOptionOrder(VariableType).Select(y => $"{y:X4}"))}"),
                 VariableType == UefiLoadOptionType.Boot ? "No BootOrder is set; firmware will attempt recovery" : $"No { Enum.GetName(typeof(UefiLoadOptionType), VariableType)}Order is set",
                 verbosity: 2);
-            */
 
             // Windows does not provide any documented function to iterate over all available firmware variables
             // An undocumented function NtEnumerateBootEntries ntdll.dll returns all boot options in Windows specific struct
             // It internally calls HalEnumerateEnvironmentVariablesEx from hal.dll, which actually returns all variables,
             // filters them to only show Boot#### variables, and do additional parsing for convenience and Windows specific options. 
 
-            var BootEntryNames = read_all_boot_entry_names();
+            var BootEntryNames = ReadAllBootEntryNames();
 
             foreach (var variableName in BootEntryNames)
             {
@@ -180,8 +178,10 @@ namespace EfiBootMgr
                 try
                 {
                     (buffer, size) = read_dyn(variableName);
-                    var loadOption = EfiLoadOption.MarshalFromNative(buffer);
-                    Console.WriteLine(variableName + ((loadOption.Attributes & EfiLoadOption.LOAD_OPTION_ACTIVE) != 0 ? "* " : "  ") + loadOption.Description);
+                    var loadOption = EfiLoadOption.FromNative(buffer, size);
+                    Console.Write(variableName + ((loadOption.Attributes & EfiLoadOption.LOAD_OPTION_ACTIVE) != 0 ? "* " : "  ") + loadOption.Description);
+                    Console.Write("\t");
+                    Console.WriteLine(loadOption.FilePathList.ToString());
                 }
                 catch (Win32Exception win32exeption)
                 {
@@ -196,10 +196,26 @@ namespace EfiBootMgr
                 }
             }
 
-            //show_mirror??
 #if DEBUG
             Console.ReadLine();
 #endif
+        }
+
+        public static bool ByteArrayToFile(string fileName, byte[] byteArray)
+        {
+            try
+            {
+                using (var fs = new System.IO.FileStream(fileName, System.IO.FileMode.Create, System.IO.FileAccess.Write))
+                {
+                    fs.Write(byteArray, 0, byteArray.Length);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Exception caught in process: {0}", ex);
+                return false;
+            }
         }
     }
 
@@ -236,8 +252,8 @@ namespace EfiBootMgr
         public uint Attributes;
         public ushort FilePathListLength;
         public string Description;
-        //public EFI_DEVICE_PATH_PROTOCOL FilePathList;
-        public byte[] OptionalData;
+        public EfiDevicePath FilePathList;
+        //public byte[] OptionalData;
 
         public const int LOAD_OPTION_ACTIVE = 0x00000001;
         public const int LOAD_OPTION_FORCE_RECONNECT = 0x00000002;
@@ -246,20 +262,193 @@ namespace EfiBootMgr
         public const int LOAD_OPTION_CATEGORY_BOOT = 0x00000000;
         public const int LOAD_OPTION_CATEGORY_APP = 0x00000100;
 
-        public unsafe static EfiLoadOption MarshalFromNative(IntPtr data)
+        private byte[] data;
+
+        public unsafe static EfiLoadOption FromNative(IntPtr data, uint size)
         {
             var result = new EfiLoadOption();
             result.Attributes = *(uint*)data;
             result.FilePathListLength = *(ushort*)(data + 4);
-            result.Description = Marshal.PtrToStringUni(data + 6);
+            result.Description = Utils.UCS2BufferToString(data + 6);
+            result.data = new byte[size];
+
+            Marshal.Copy(data, result.data, 0, (int)size);
+
+            var startFilePathList = 6 + System.Text.Encoding.Unicode.GetByteCount(result.Description) + 2;
+
+            if (size - startFilePathList >= result.FilePathListLength)
+            {
+                result.FilePathList = EfiDevicePath.FromNative(data + startFilePathList, result.FilePathListLength);
+            }
+            else
+            {
+                throw new Exception($"EFI load option `{result.Description}` has invalid FilePathListLength");
+            }
+
+
+            return result;
+        }
+    }
+
+    struct EfiDevicePath
+    {
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public struct EfiDpNodeHeader
+        {
+            public byte Type;
+            public byte Subtype;
+            public ushort Length;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 1)]
+        public unsafe struct EfiDpNodeHd
+        {
+            public EfiDpNodeHeader Header;
+            public uint PartitionNumber;
+            public ulong Start;
+            public ulong Size;
+            public fixed byte Signature[16];
+            public byte Format;
+            public byte SignatureType;
+            // byte padding[6]; /* __ia64 Emperically needed */
+
+            public override string ToString()
+            {
+                fixed (EfiDpNodeHd* p = &this)
+                {
+                    var signatureBytes = new byte[16];
+                    Marshal.Copy((IntPtr)p->Signature, signatureBytes, 0, 16);
+
+                    switch (SignatureType)
+                    {
+                        case Constants.EFIDP_HD_SIGNATURE_MBR:
+                            // TODO:
+                            var x = signatureBytes[0] | signatureBytes[1] << 8 | signatureBytes[2] << 16 | signatureBytes[3] << 24;
+
+                            return $"HD({PartitionNumber},MBR,0x{x.ToString("x")},0x{Start.ToString("x")},0x{Size.ToString("x")})";
+                        case Constants.EFIDP_HD_SIGNATURE_GUID:
+                            return $"HD({PartitionNumber},GPT,{new Guid(signatureBytes).ToString()})";
+                        default:
+                            return $"HD({PartitionNumber},{SignatureType},{BitConverter.ToString(signatureBytes).Replace("-", "")},0x{Start.ToString("x")},0x{Size.ToString("x")})";
+                    }
+
+                }
+            }
+        }
+
+        // MUST MARSHALL MANUALLY
+        public unsafe struct EfiDpNodeFile
+        {
+            public EfiDpNodeHeader Header;
+            public string PathName;
+
+            public override string ToString()
+            {
+                return $"File({PathName})";
+            }
+        }
+
+        public List<ValueType> Nodes;
+
+        public override string ToString()
+        {
+            return string.Join("/", Nodes);
+        }
+
+        public unsafe static EfiDevicePath FromNative(IntPtr data, uint size)
+        {
+            var result = new EfiDevicePath() { Nodes = new List<ValueType>() };
+            IntPtr start = data;
+            var endAllReached = false;
+            
+            while (start.ToInt64() < (data.ToInt64() + size))
+            {
+                var header = Marshal.PtrToStructure<EfiDpNodeHeader>(start);
+
+                if ((start + header.Length).ToInt64() > (data.ToInt64() + size))
+                {
+                    throw new Exception("device path node length overruns buffer");
+                }
+
+                switch (header.Type)
+                {
+                    /*
+                    case (byte)NodeType.Hardware:
+                        if (n.SubType != 4 && n.Length > 1024)
+                        {
+                            throw new Exception("invalid hardware node");
+                        }
+                        break;
+                    case (byte)NodeType.Acpi:
+                        if (n.Length > 1024)
+                        {
+                            throw new Exception("invalid ACPI node");
+                        }
+                        break;
+                    case (byte)NodeType.Mesage:
+                        if (n.SubType != 0x0a && n.Length > 1024)
+                        {
+                            throw new Exception("invalid message node");
+                        }
+                        break;
+                    case (byte)NodeType.BiosBoot:
+                        break;
+                    */
+                    case Constants.EFIDP_MEDIA_TYPE:
+                        switch (header.Subtype)
+                        {
+                            case Constants.EFIDP_MEDIA_HD:
+                                var hdNode = Marshal.PtrToStructure<EfiDpNodeHd>(start);
+                                result.Nodes.Add(hdNode);
+
+                                break;
+                            case Constants.EFIDP_MEDIA_FILE:
+                                var filePath = Utils.UCS2BufferToString(start + sizeof(EfiDpNodeHeader));
+                                result.Nodes.Add(new EfiDpNodeFile() { PathName = filePath, Header = header });
+
+                                break;
+                        }
+                        break;
+                    case Constants.EFIDP_END_TYPE:
+                        if (header.Length > 4)
+                        {
+                            throw new Exception("invalid end node");
+                        }
+                        // TODO: handle instance end node
+                        endAllReached = true;
+                        break;
+                    default:
+                        Console.WriteLine(header.Type);
+                        break;
+                        //throw new Exception("invalid device path node type");
+
+                }
+
+                start += header.Length;
+
+                if (endAllReached)
+                {
+                    break;
+                }
+            }
+
+            if (!endAllReached)
+            {
+                throw new Exception("device path missing end node");
+            }
 
             return result;
         }
 
-        //public static IntPtr MarshalToNative(EFILoadOption data)
-        //{
-
-        //}
+        public enum NodeType: byte
+        {
+            Hardware = 1,
+            Acpi,
+            Mesage,
+            Media,
+            BiosBoot,
+            End = 0x7f,
+        }
     }
 
     // BOOT_ENTRY, which is the Windows representation of EFI_LOAD_OPTION 
@@ -274,7 +463,7 @@ namespace EfiBootMgr
         // OsOptionsLength: ULONG,
         // OsOptions: [UCHAR; 1],
         
-        public unsafe static NtEfiBootEntry MarshalFromNative(IntPtr data)
+        public unsafe static NtEfiBootEntry FromNative(IntPtr data)
         {
             var result = new NtEfiBootEntry();
             result.Id = *(uint*)(data + 8);
@@ -289,7 +478,7 @@ namespace EfiBootMgr
         public uint NextEntryOffset; // offset from start of whole data to next BOOT_ENTRY_LIST
         public IntPtr BootEntry; // BOOT_ENTRY, not actually a pointer, just put it her for convenience
 
-        public unsafe static NtEfiBootEntryList MarshalFromNative(IntPtr data)
+        public unsafe static NtEfiBootEntryList FromNative(IntPtr data)
         {
             var result = new NtEfiBootEntryList();
             result.NextEntryOffset = *(uint*)data;
