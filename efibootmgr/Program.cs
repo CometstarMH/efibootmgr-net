@@ -337,7 +337,7 @@ namespace EfiBootMgr
         }
 
         // MUST MARSHALL MANUALLY
-        public unsafe struct EfiDpNodeFile
+        public struct EfiDpNodeFile
         {
             public EfiDpNodeHeader Header;
             public string PathName;
@@ -345,6 +345,14 @@ namespace EfiBootMgr
             public override string ToString()
             {
                 return $"File({PathName})";
+            }
+        }
+
+        public struct EfiDpInstanceEndNode
+        {
+            public override string ToString()
+            {
+                return ",";
             }
         }
 
@@ -407,15 +415,29 @@ namespace EfiBootMgr
                                 result.Nodes.Add(new EfiDpNodeFile() { PathName = filePath, Header = header });
 
                                 break;
+                            default:
+                                throw new Exception("invalid media node");
                         }
                         break;
                     case Constants.EFIDP_END_TYPE:
                         if (header.Length > 4)
                         {
+                            throw new Exception("invalid end node, too long");
+                        }
+
+                        if (header.Subtype == 0x01)
+                        {
+                            result.Nodes.Add(new EfiDpInstanceEndNode());
+                        }
+                        else if (header.Subtype == 0xFF)
+                        {
+                            endAllReached = true;
+                        }
+                        else
+                        {
                             throw new Exception("invalid end node");
                         }
-                        // TODO: handle instance end node
-                        endAllReached = true;
+
                         break;
                     default:
                         Console.WriteLine(header.Type);
