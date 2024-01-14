@@ -2,6 +2,15 @@
 {
     public static class Constants
     {
+        /* load option attr flags */
+        public const int LOAD_OPTION_ACTIVE = 0x00000001;
+        public const int LOAD_OPTION_FORCE_RECONNECT = 0x00000002;
+        public const int LOAD_OPTION_HIDDEN = 0x00000008;
+        public const int LOAD_OPTION_CATEGORY = 0x00001F00;
+        public const int LOAD_OPTION_CATEGORY_BOOT = 0x00000000;
+        public const int LOAD_OPTION_CATEGORY_APP = 0x00000100;
+
+        /* device path */
         /* top-level types */
         public const byte EFIDP_HARDWARE_TYPE = 0x01;
         public const byte EFIDP_ACPI_TYPE = 0x02;
