@@ -10,11 +10,11 @@ namespace EfiBootMgr
         // public uint Version;
         // public uint Length;
         public uint Id; // four-digit hex number part of its name Boot####
-                        // public uint Attributes;
-                        // public string FriendlyName; //FriendlyNameOffset: ULONG,
-                        // public string BootFilePath; //BootFilePathOffset: ULONG,
-                        // OsOptionsLength: ULONG,
-                        // OsOptions: [UCHAR; 1],
+        // public uint Attributes;
+        // public string FriendlyName; //FriendlyNameOffset: ULONG,
+        // public string BootFilePath; //BootFilePathOffset: ULONG,
+        // OsOptionsLength: ULONG,
+        // OsOptions: [UCHAR; 1],
 
         public unsafe static NtEfiBootEntry FromNative(IntPtr data)
         {
@@ -29,7 +29,42 @@ namespace EfiBootMgr
     struct NtEfiBootEntryList
     {
         public uint NextEntryOffset; // offset from start of whole data to next BOOT_ENTRY_LIST
-        public IntPtr BootEntry; // BOOT_ENTRY, not actually a pointer, just put it her for convenience
+        public IntPtr BootEntry; // BOOT_ENTRY, not actually a pointer, just put it here for convenience
+
+        public unsafe static NtEfiBootEntryList FromNative(IntPtr data)
+        {
+            var result = new NtEfiBootEntryList();
+            result.NextEntryOffset = *(uint*)data;
+            result.BootEntry = data + 4;
+
+            return result;
+        }
+    }
+
+    // EFI_DRIVER_ENTRY, which is the Windows representation of EFI_LOAD_OPTION for Driver#### entries
+    struct NtEfiDriverEntry
+    {
+        // public uint Version;
+        // public uint Length;
+        public uint Id; // four-digit hex number part of its name Boot####
+        // public uint Attributes;
+        // public string FriendlyName; //FriendlyNameOffset: ULONG,
+        // public string BootFilePath; //BootFilePathOffset: ULONG,
+        
+        public unsafe static NtEfiDriverEntry FromNative(IntPtr data)
+        {
+            var result = new NtEfiDriverEntry();
+            result.Id = *(uint*)(data + 8);
+
+            return result;
+        }
+    }
+
+    // EFI_DRIVER_ENTRY_LIST, singly linked list of EFI_DRIVER_ENTRY
+    struct NtEfiDriverEntryList
+    {
+        public uint NextEntryOffset; // offset from start of whole data to next BOOT_ENTRY_LIST
+        public IntPtr EfiDriverEntry; // EFI_DRIVER_ENTRY, not actually a pointer, just put it here for convenience
 
         public unsafe static NtEfiBootEntryList FromNative(IntPtr data)
         {

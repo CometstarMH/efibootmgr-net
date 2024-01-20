@@ -82,6 +82,11 @@ namespace EfiBootMgr
         [DllImport("ntdll.dll", CharSet = CharSet.Unicode, SetLastError = false)]
         [return: MarshalAs(UnmanagedType.U4)]
         internal static extern NtStatus NtEnumerateBootEntries(IntPtr pBuffer, ref uint bufferLength);
+
+        // Undocumented
+        [DllImport("ntdll.dll", CharSet = CharSet.Unicode, SetLastError = false)]
+        [return: MarshalAs(UnmanagedType.U4)]
+        internal static extern NtStatus NtEnumerateDriverEntries(IntPtr pBuffer, ref uint bufferLength);
     }
     public enum NtStatus : uint
     {

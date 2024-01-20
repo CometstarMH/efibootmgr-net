@@ -140,7 +140,8 @@ namespace EfiBootMgr
             // Parse options
             new Mono.Options.OptionSet
             {
-                { "y|sysprep", "Operate on SysPrep variables, not Boot Variables.", n => VariableType = UefiLoadOptionType.SysPrep },
+                // Windows only directly supports Driver and Boot variables
+                //{ "y|sysprep", "Operate on SysPrep variables, not Boot Variables.", n => VariableType = UefiLoadOptionType.SysPrep },
                 { "r|driver", "Operate on Driver variables, not Boot Variables.", n => VariableType = UefiLoadOptionType.Driver },
                 { "v|verbose", "print additional information", n => ErrorHandling.Verbosity++ },
             }.Parse(args);
