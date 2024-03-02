@@ -370,9 +370,12 @@ namespace EfiBootMgr
 
                         break;
                     default:
-                        Console.WriteLine(header.Type);
-                        break;
+                        var node = Marshal.PtrToStructure<EfiDpNodeUnknown>(start);
+
+                        result.Nodes.Add(node);
+                        //Console.WriteLine(header.Type);
                         //throw new Exception("invalid device path node type");
+                        break;
 
                 }
 

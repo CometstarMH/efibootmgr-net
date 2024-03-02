@@ -86,6 +86,26 @@ namespace EfiBootMgr
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public unsafe struct EfiDpNodeUnknown
+    {
+        public EfiDpNodeHeader Header;
+        // byte padding[6]; /* __ia64 Emperically needed */
+
+        public override string ToString()
+        {
+            fixed (EfiDpNodeUnknown* p = &this)
+            {
+                var lengthToDump = this.Header.Length - 4; // header fields are not dumped
+                var dump = new byte[lengthToDump];
+                Marshal.Copy((IntPtr)p+4, dump, 0, lengthToDump);
+
+                return $"Path({this.Header.Type},{this.Header.Subtype},{BitConverter.ToString(dump).Replace("-", "")})";
+            }
+        }
+    }
+
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public unsafe struct EfiDpNodeHd
     {
         public EfiDpNodeHeader Header;
