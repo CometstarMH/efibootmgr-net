@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace EfiBootMgr
 {
 
-    // BOOT_ENTRY, which is the Windows representation of EFI_LOAD_OPTION 
+    // BOOT_ENTRY, which is the Windows representation of EFI_LOAD_OPTION
     struct NtEfiBootEntry
     {
         // public uint Version;
@@ -18,8 +18,10 @@ namespace EfiBootMgr
 
         public unsafe static NtEfiBootEntry FromNative(IntPtr data)
         {
-            var result = new NtEfiBootEntry();
-            result.Id = *(uint*)(data + 8);
+            var result = new NtEfiBootEntry
+            {
+                Id = *(uint*)(data + 8)
+            };
 
             return result;
         }
@@ -33,9 +35,11 @@ namespace EfiBootMgr
 
         public unsafe static NtEfiBootEntryList FromNative(IntPtr data)
         {
-            var result = new NtEfiBootEntryList();
-            result.NextEntryOffset = *(uint*)data;
-            result.BootEntry = data + 4;
+            var result = new NtEfiBootEntryList
+            {
+                NextEntryOffset = *(uint*)data,
+                BootEntry = data + 4
+            };
 
             return result;
         }
@@ -50,11 +54,13 @@ namespace EfiBootMgr
         // public uint Attributes;
         // public string FriendlyName; //FriendlyNameOffset: ULONG,
         // public string BootFilePath; //BootFilePathOffset: ULONG,
-        
+
         public unsafe static NtEfiDriverEntry FromNative(IntPtr data)
         {
-            var result = new NtEfiDriverEntry();
-            result.Id = *(uint*)(data + 8);
+            var result = new NtEfiDriverEntry
+            {
+                Id = *(uint*)(data + 8)
+            };
 
             return result;
         }
@@ -68,14 +74,15 @@ namespace EfiBootMgr
 
         public unsafe static NtEfiBootEntryList FromNative(IntPtr data)
         {
-            var result = new NtEfiBootEntryList();
-            result.NextEntryOffset = *(uint*)data;
-            result.BootEntry = data + 4;
+            var result = new NtEfiBootEntryList
+            {
+                NextEntryOffset = *(uint*)data,
+                BootEntry = data + 4
+            };
 
             return result;
         }
     }
-
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct EfiDpNodeHeader
@@ -147,11 +154,11 @@ namespace EfiBootMgr
                         // TODO:
                         var x = signatureBytes[0] | signatureBytes[1] << 8 | signatureBytes[2] << 16 | signatureBytes[3] << 24;
 
-                        return $"HD({PartitionNumber},MBR,0x{x.ToString("x")},0x{Start.ToString("x")},0x{Size.ToString("x")})";
+                        return $"HD({PartitionNumber},MBR,0x{x:x},0x{Start:x},0x{Size:x})";
                     case Constants.EFIDP_HD_SIGNATURE_GUID:
-                        return $"HD({PartitionNumber},GPT,{new Guid(signatureBytes).ToString()})";
+                        return $"HD({PartitionNumber},GPT,{new Guid(signatureBytes)})";
                     default:
-                        return $"HD({PartitionNumber},{SignatureType},{BitConverter.ToString(signatureBytes).Replace("-", "")},0x{Start.ToString("x")},0x{Size.ToString("x")})";
+                        return $"HD({PartitionNumber},{SignatureType},{BitConverter.ToString(signatureBytes).Replace("-", "")},0x{Start:x},0x{Size:x})";
                 }
 
             }

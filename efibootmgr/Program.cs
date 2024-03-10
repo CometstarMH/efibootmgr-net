@@ -67,8 +67,10 @@ namespace EfiBootMgr
                         size *= 2;
                         continue;
                     }
+
                     throw new Win32Exception(lastError);
                 }
+
                 break;
             }
 
@@ -123,7 +125,7 @@ namespace EfiBootMgr
             for (var x = NtEfiBootEntryList.FromNative(currPtr); ; x = NtEfiBootEntryList.FromNative(currPtr += (int)x.NextEntryOffset))
             {
                 var id = NtEfiBootEntry.FromNative(x.BootEntry).Id;
-                result.Add($"Boot{id.ToString("X4")}");
+                result.Add($"Boot{id:X4}");
 
                 if (x.NextEntryOffset == 0)
                 {
@@ -146,12 +148,12 @@ namespace EfiBootMgr
                 { "v|verbose", "print additional information", n => ErrorHandling.Verbosity++ },
             }.Parse(args);
 
-
             if (!IsElevated)
             {
                 Console.WriteLine("Administrative privileges are needed.");
                 return;
             }
+
             Privileges.EnablePrivilege(Privileges.SecurityEntity.SE_SYSTEM_ENVIRONMENT_NAME);
 
             if (VariableType == UefiLoadOptionType.Boot)
@@ -168,7 +170,7 @@ namespace EfiBootMgr
             // Windows does not provide any documented function to iterate over all available firmware variables
             // An undocumented function NtEnumerateBootEntries ntdll.dll returns all boot options in Windows specific struct
             // It internally calls HalEnumerateEnvironmentVariablesEx from hal.dll, which actually returns all variables,
-            // filters them to only show Boot#### variables, and do additional parsing for convenience and Windows specific options. 
+            // filters them to only show Boot#### variables, and do additional parsing for convenience and Windows specific options.
 
             var BootEntryNames = ReadAllBootEntryNames();
 
@@ -206,11 +208,9 @@ namespace EfiBootMgr
         {
             try
             {
-                using (var fs = new System.IO.FileStream(fileName, System.IO.FileMode.Create, System.IO.FileAccess.Write))
-                {
-                    fs.Write(byteArray, 0, byteArray.Length);
-                    return true;
-                }
+                using var fs = new System.IO.FileStream(fileName, System.IO.FileMode.Create, System.IO.FileAccess.Write);
+                fs.Write(byteArray, 0, byteArray.Length);
+                return true;
             }
             catch (Exception ex)
             {
@@ -260,11 +260,13 @@ namespace EfiBootMgr
 
         public unsafe static EfiLoadOption FromNative(IntPtr data, uint size)
         {
-            var result = new EfiLoadOption();
-            result.Attributes = *(uint*)data;
-            result.FilePathListLength = *(ushort*)(data + 4);
-            result.Description = Utils.UCS2BufferToString(data + 6);
-            result.data = new byte[size];
+            var result = new EfiLoadOption
+            {
+                Attributes = *(uint*)data,
+                FilePathListLength = *(ushort*)(data + 4),
+                Description = Utils.UCS2BufferToString(data + 6),
+                data = new byte[size]
+            };
 
             Marshal.Copy(data, result.data, 0, (int)size);
 
@@ -278,7 +280,6 @@ namespace EfiBootMgr
             {
                 throw new Exception($"EFI load option `{result.Description}` has invalid FilePathListLength");
             }
-
 
             return result;
         }
@@ -298,7 +299,7 @@ namespace EfiBootMgr
             var result = new EfiDevicePath() { Nodes = new List<ValueType>() };
             IntPtr start = data;
             var endAllReached = false;
-            
+
             while (start.ToInt64() < (data.ToInt64() + size))
             {
                 var header = Marshal.PtrToStructure<EfiDpNodeHeader>(start);
@@ -341,6 +342,7 @@ namespace EfiBootMgr
                                     break;
                                 }
                         }
+
                         break;
                     case Constants.EFIDP_MESSAGE_TYPE:
                         /*
@@ -358,6 +360,7 @@ namespace EfiBootMgr
                                     break;
                                 }
                         }
+
                         break;
                     case Constants.EFIDP_MEDIA_TYPE:
                         switch (header.Subtype)
@@ -375,6 +378,7 @@ namespace EfiBootMgr
                             default:
                                 throw new Exception("invalid media node");
                         }
+
                         break;
                     case Constants.EFIDP_BIOS_BOOT_TYPE:
                         switch (header.Subtype)
@@ -386,6 +390,7 @@ namespace EfiBootMgr
                                     break;
                                 }
                         }
+
                         break;
                     case Constants.EFIDP_END_TYPE:
                         if (header.Length > 4)
@@ -416,7 +421,6 @@ namespace EfiBootMgr
                             //throw new Exception("invalid device path node type");
                             break;
                         }
-
                 }
 
                 start += header.Length;
