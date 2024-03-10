@@ -310,28 +310,55 @@ namespace EfiBootMgr
 
                 switch (header.Type)
                 {
-                    /*
-                    case (byte)NodeType.Hardware:
-                        if (n.SubType != 4 && n.Length > 1024)
+                    case Constants.EFIDP_HARDWARE_TYPE:
+                        switch (header.Subtype)
                         {
-                            throw new Exception("invalid hardware node");
+                            default:
+                                {
+                                    var node = Marshal.PtrToStructure<EfiDpNodeUnknown>(start);
+
+                                    result.Nodes.Add(node);
+                                    //Console.WriteLine(header.Type);
+                                    //throw new Exception("invalid device path node type");
+                                    break;
+                                }
                         }
+
                         break;
-                    case (byte)NodeType.Acpi:
+                    case Constants.EFIDP_ACPI_TYPE:
+                        /*
                         if (n.Length > 1024)
                         {
                             throw new Exception("invalid ACPI node");
                         }
+                        */
+                        switch (header.Subtype)
+                        {
+                            default:
+                                {
+                                    var node = Marshal.PtrToStructure<EfiDpNodeUnknown>(start);
+                                    result.Nodes.Add(node);
+                                    break;
+                                }
+                        }
                         break;
-                    case (byte)NodeType.Mesage:
+                    case Constants.EFIDP_MESSAGE_TYPE:
+                        /*
                         if (n.SubType != 0x0a && n.Length > 1024)
                         {
                             throw new Exception("invalid message node");
                         }
+                        */
+                        switch (header.Subtype)
+                        {
+                            default:
+                                {
+                                    var node = Marshal.PtrToStructure<EfiDpNodeUnknown>(start);
+                                    result.Nodes.Add(node);
+                                    break;
+                                }
+                        }
                         break;
-                    case (byte)NodeType.BiosBoot:
-                        break;
-                    */
                     case Constants.EFIDP_MEDIA_TYPE:
                         switch (header.Subtype)
                         {
@@ -347,6 +374,17 @@ namespace EfiBootMgr
                                 break;
                             default:
                                 throw new Exception("invalid media node");
+                        }
+                        break;
+                    case Constants.EFIDP_BIOS_BOOT_TYPE:
+                        switch (header.Subtype)
+                        {
+                            default:
+                                {
+                                    var node = Marshal.PtrToStructure<EfiDpNodeUnknown>(start);
+                                    result.Nodes.Add(node);
+                                    break;
+                                }
                         }
                         break;
                     case Constants.EFIDP_END_TYPE:
@@ -370,12 +408,14 @@ namespace EfiBootMgr
 
                         break;
                     default:
-                        var node = Marshal.PtrToStructure<EfiDpNodeUnknown>(start);
+                        {
+                            var node = Marshal.PtrToStructure<EfiDpNodeUnknown>(start);
 
-                        result.Nodes.Add(node);
-                        //Console.WriteLine(header.Type);
-                        //throw new Exception("invalid device path node type");
-                        break;
+                            result.Nodes.Add(node);
+                            //Console.WriteLine(header.Type);
+                            //throw new Exception("invalid device path node type");
+                            break;
+                        }
 
                 }
 
@@ -393,16 +433,6 @@ namespace EfiBootMgr
             }
 
             return result;
-        }
-
-        public enum NodeType: byte
-        {
-            Hardware = 1,
-            Acpi,
-            Mesage,
-            Media,
-            BiosBoot,
-            End = 0x7f,
         }
     }
 }

@@ -93,14 +93,31 @@ namespace EfiBootMgr
 
         public override string ToString()
         {
+            var lengthToDump = this.Header.Length - 4; // header fields are not dumped
+            var dump = new byte[lengthToDump];
+
             fixed (EfiDpNodeUnknown* p = &this)
             {
-                var lengthToDump = this.Header.Length - 4; // header fields are not dumped
-                var dump = new byte[lengthToDump];
                 Marshal.Copy((IntPtr)p+4, dump, 0, lengthToDump);
-
-                return $"Path({this.Header.Type},{this.Header.Subtype},{BitConverter.ToString(dump).Replace("-", "")})";
             }
+
+            var optionName = this.Header.Type switch {
+                Constants.EFIDP_HARDWARE_TYPE => "HardwarePath",
+                Constants.EFIDP_ACPI_TYPE => "AcpiPath",
+                Constants.EFIDP_MESSAGE_TYPE => "Msg",
+                Constants.EFIDP_MEDIA_TYPE => "MediaPath",
+                Constants.EFIDP_BIOS_BOOT_TYPE => "BbsPath",
+                _ => "Path"
+            };
+
+            if (optionName == "Path")
+            {
+                return $"Path({this.Header.Type},{this.Header.Subtype},{BitConverter.ToString(dump).Replace("-", "")})";
+            } else
+            {
+                return $"{optionName}({this.Header.Subtype},{BitConverter.ToString(dump).Replace("-", "")})";
+            }
+
         }
     }
 
