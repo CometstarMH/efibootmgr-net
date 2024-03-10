@@ -62,7 +62,7 @@
         public const byte EFIDP_MSG_EMMC = 0x1d;
         public const byte EFIDP_MSG_BTLE = 0x1e;
         public const byte EFIDP_MSG_DNS = 0x1f;
-        public const byte EFIDP_MSG_NVDIMM = 0x20;
+        public const byte EFIDP_MSG_REST = 0x20;
 
         /* 0x04 media subtypes */
         public const byte EFIDP_MEDIA_HD = 0x01;

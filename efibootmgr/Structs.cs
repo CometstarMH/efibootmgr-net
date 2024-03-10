@@ -108,26 +108,9 @@ namespace EfiBootMgr
                 Marshal.Copy((IntPtr)p+4, dump, 0, lengthToDump);
             }
 
-            var optionName = this.Header.Type switch {
-                Constants.EFIDP_HARDWARE_TYPE => "HardwarePath",
-                Constants.EFIDP_ACPI_TYPE => "AcpiPath",
-                Constants.EFIDP_MESSAGE_TYPE => "Msg",
-                Constants.EFIDP_MEDIA_TYPE => "MediaPath",
-                Constants.EFIDP_BIOS_BOOT_TYPE => "BbsPath",
-                _ => "Path"
-            };
-
-            if (optionName == "Path")
-            {
-                return $"Path({this.Header.Type},{this.Header.Subtype},{BitConverter.ToString(dump).Replace("-", "")})";
-            } else
-            {
-                return $"{optionName}({this.Header.Subtype},{BitConverter.ToString(dump).Replace("-", "")})";
-            }
-
+            return Utils.FormatDeviceNode(this.Header.Type, this.Header.Subtype, BitConverter.ToString(dump).Replace("-", ""));
         }
     }
-
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public unsafe struct EfiDpNodeHd
@@ -154,13 +137,12 @@ namespace EfiBootMgr
                         // TODO:
                         var x = signatureBytes[0] | signatureBytes[1] << 8 | signatureBytes[2] << 16 | signatureBytes[3] << 24;
 
-                        return $"HD({PartitionNumber},MBR,0x{x:x},0x{Start:x},0x{Size:x})";
+                        return Utils.FormatDeviceNode(this.Header.Type, this.Header.Subtype, "MBR", $"0x{x:x}", $"0x{Start:x}", $"0x{Size:x}");
                     case Constants.EFIDP_HD_SIGNATURE_GUID:
                         return $"HD({PartitionNumber},GPT,{new Guid(signatureBytes)})";
                     default:
                         return $"HD({PartitionNumber},{SignatureType},{BitConverter.ToString(signatureBytes).Replace("-", "")},0x{Start:x},0x{Size:x})";
                 }
-
             }
         }
     }
