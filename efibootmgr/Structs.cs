@@ -137,11 +137,19 @@ namespace EfiBootMgr
                         // TODO:
                         var x = signatureBytes[0] | signatureBytes[1] << 8 | signatureBytes[2] << 16 | signatureBytes[3] << 24;
 
-                        return Utils.FormatDeviceNode(this.Header.Type, this.Header.Subtype, "MBR", $"0x{x:x}", $"0x{Start:x}", $"0x{Size:x}");
+                        return Utils.FormatDeviceNode(this.Header.Type, this.Header.Subtype, PartitionNumber.ToString(), "MBR", $"0x{x:x}", $"0x{Start:x}", $"0x{Size:x}");
                     case Constants.EFIDP_HD_SIGNATURE_GUID:
-                        return $"HD({PartitionNumber},GPT,{new Guid(signatureBytes)})";
+                        return Utils.FormatDeviceNode(this.Header.Type, this.Header.Subtype, PartitionNumber.ToString(), "GPT", new Guid(signatureBytes).ToString());
                     default:
-                        return $"HD({PartitionNumber},{SignatureType},{BitConverter.ToString(signatureBytes).Replace("-", "")},0x{Start:x},0x{Size:x})";
+                        return Utils.FormatDeviceNode(
+                            this.Header.Type,
+                            this.Header.Subtype,
+                            PartitionNumber.ToString(),
+                            SignatureType.ToString(),
+                            BitConverter.ToString(signatureBytes).Replace("-", ""),
+                            $"0x{Start:x}",
+                            $"0x{Size:x}"
+                        );
                 }
             }
         }
