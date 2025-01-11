@@ -273,7 +273,8 @@ public static class BytesReader
                 position += size;
             }
         }
-        else if (type.IsArray) {
+        else if (type.IsArray)
+        {
             // TODO: nested array?
             throw new NotImplementedException();
         }

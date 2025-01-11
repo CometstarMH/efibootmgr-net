@@ -39,9 +39,8 @@ namespace EfiBootMgr
                 }
                 else
                 {
-                    PrintWarning(verbosity, msg); 
+                    PrintWarning(verbosity, msg);
                 }
-
             }
         }
     }

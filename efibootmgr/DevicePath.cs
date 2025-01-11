@@ -66,6 +66,7 @@ namespace EfiBootMgr.DevicePath
             {
                 throw new ArgumentOutOfRangeException(nameof(data), "Device Path data has invalid length.");
             }
+
             Data = data;
         }
 
@@ -76,6 +77,7 @@ namespace EfiBootMgr.DevicePath
                 buffer += int.MaxValue;
                 offset -= int.MaxValue;
             }
+
             buffer += (int)offset;
 
             void* ptr = buffer.ToPointer();
@@ -86,6 +88,7 @@ namespace EfiBootMgr.DevicePath
             {
                 throw new ArgumentException(nameof(offset), $"Buffer at offset {offset} does not contain enough data as indicated at offset + 2.");
             }
+
             byte[] temp = new byte[length];
             Marshal.Copy(buffer, temp, 0, length);
 
@@ -127,6 +130,7 @@ namespace EfiBootMgr.DevicePath
             {
                 return ",";
             }
+
             return "";
         }
 
@@ -509,6 +513,7 @@ namespace EfiBootMgr.DevicePath
                     temp.Add(BitConverter.ToUInt32(Data, i));
                     i += sizeof(uint);
                 }
+
                 return temp.ToArray();
             }
         }
