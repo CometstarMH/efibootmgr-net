@@ -320,10 +320,28 @@ public static class BytesReader
             dynamic? val = null;
             int size = 0;
 
-            if (fieldType.IsPrimitive || fieldType.IsEnum)
+            var customParserAttr = field.GetCustomAttribute<CustomParserAttribute>(true);
+
+            if (customParserAttr != null)
+            {
+                (val, size) = customParserAttr.Parse(source, field, readFieldVals);
+            }
+            else if (fieldType.IsPrimitive || fieldType.IsEnum)
             {
                 (val, size) = ReadValue(source.Slice(position), field);
                 readFieldVals.Add(field.Name, val);
+
+                var structSizeAttr = field.GetCustomAttribute<StructSizeAttribute>(true);
+
+                if (structSizeAttr != null)
+                {
+                    if (!IsNumericType(val))
+                    {
+                        throw new InvalidOperationException($"Field {field.Name} has {nameof(StructSizeAttribute)} specified but it is not numeric");
+                    }
+
+                    source = source.Slice(0, (int)val);
+                }
             }
             else if (fieldType == typeof(string))
             {
@@ -361,7 +379,7 @@ public static class BytesReader
         return position;
     }
 
-    private static (object, int) ReadObject(ReadOnlySpan<byte> source, Type type)
+    public static (object, int) ReadObject(ReadOnlySpan<byte> source, Type type)
     {
         object result = Activator.CreateInstance(type)!;
         var length = ReadObjectInternal(source, result, type);

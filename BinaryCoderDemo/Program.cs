@@ -1,5 +1,6 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using BinaryCoder;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 Console.WriteLine("start");
@@ -19,6 +20,7 @@ byte[] a = new byte[] {
     13, 5, 11, 3, // int
     42,
     13, 5, 11, 3, // int
+    0, // replaced by custom parser
     1, 2, 3, 4, 5, 6,
 };
 var (x, pos) = BytesReader.ReadObject<X>(new Span<byte>(a));
@@ -35,6 +37,7 @@ Console.WriteLine(x.f.b);
 Console.WriteLine(x.h[0].a);
 Console.WriteLine(x.h[1].b);
 Console.WriteLine(String.Join(", ", x.i));
+Console.WriteLine(x.j);
 
 [StructLayout(LayoutKind.Sequential)]
 public class X
@@ -53,6 +56,8 @@ public class X
     public byte g;
     [ArraySize(nameof(g))]
     public Y[] h;
+    [DummyParser]
+    public byte j;
     [RemainingBytes]
     public byte[] i;
 }
@@ -64,3 +69,11 @@ public class Y
     public int b;
 }
 
+[AttributeUsage(AttributeTargets.Field)]
+public class DummyParserAttribute : CustomParserAttribute
+{
+    public override (object, int) Parse(ReadOnlySpan<byte> source, FieldInfo field, Dictionary<string, dynamic> readFieldVals)
+    {
+        return ((byte)77, 1);
+    }
+}
