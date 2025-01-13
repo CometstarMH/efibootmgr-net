@@ -248,7 +248,7 @@ public static class BytesReader
         else if (sizeAttr.ConstantSize is not null)
         {
             length = (int)sizeAttr.ConstantSize;
-            result = new dynamic[length];
+            result = Array.CreateInstance(type, length);
         }
         else
         {
@@ -324,7 +324,7 @@ public static class BytesReader
 
             if (customParserAttr != null)
             {
-                (val, size) = customParserAttr.Parse(source, field, readFieldVals);
+                (val, size) = customParserAttr.Parse(source.Slice(position), field, readFieldVals);
             }
             else if (fieldType.IsPrimitive || fieldType.IsEnum)
             {
@@ -374,6 +374,11 @@ public static class BytesReader
 
             field.SetValue(obj, val);
             position += size;
+
+            if (position >= source.Length)
+            {
+                break;
+            }
         }
 
         return position;
