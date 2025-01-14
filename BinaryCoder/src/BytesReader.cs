@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Reflection;
 using System.Text;
 
@@ -180,8 +179,15 @@ public static class BytesReader
         {
             // null terminated. size of a null character depends on encoding
             nullPattern = (encoding == StringEncoding.UTF16 || encoding == StringEncoding.UTF16BE) ? new byte[] { 0, 0 } : new byte[] { 0 };
-            var endIndex = source.IndexOf(new ReadOnlySpan<byte>(nullPattern));
-            if (endIndex == -1)
+
+            var endIndex = 0;
+
+            for (endIndex = 0; endIndex < source.Length; endIndex += nullPattern.Length)
+            {
+                if (source.Slice(endIndex, nullPattern.Length).SequenceEqual(nullPattern)) break;
+            }
+
+            if (endIndex >= source.Length)
             {
                 throw new InvalidOperationException($"Null-terminated string field {field.Name} is specified but null character is not found in bytes source");
             }
